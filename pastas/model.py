@@ -724,7 +724,7 @@ class Model:
         warmup: Optional[float] = None,
         noise: bool = True,
         solver: Optional[Solver] = None,
-        report: bool = True,
+        report: Union[bool, str] = True,
         initial: bool = True,
         weights: Optional[Series] = None,
         fit_constant: bool = True,
@@ -1686,7 +1686,7 @@ class Model:
 
     def fit_report(
         self,
-        output: str = "basic",
+        output: Optional[str] = "basic",
         warnings: bool = True,
     ) -> str:
         """Method that reports on the fit after a model is optimized.
