@@ -24,6 +24,7 @@ from .rfunc import (
     One,
     Polder,
     Spline,
+    Theis,
 )
 from .solver import LeastSquares, LmfitSolve, EmceeSolve
 import pastas.objective_functions as objfunc

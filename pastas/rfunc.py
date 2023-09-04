@@ -1,4 +1,3 @@
-# coding=utf-8
 """This module contains all the response functions available in Pastas."""
 
 from logging import getLogger
@@ -1760,7 +1759,7 @@ class Theis(RfuncBase):
             )
 
         parameters.loc[name + "_a"] = (1e2, 0.01, 1e5, True, name, "uniform")
-        parameters.loc[name + "_b"] = (0, 0, 0.499999, True, name, "uniform")
+        parameters.loc[name + "_b"] = (1e-3, 1e-3, 0.499999, True, name, "uniform")
 
         return parameters
 
@@ -1793,7 +1792,7 @@ class Theis(RfuncBase):
             u = a * b**2 * np.pi**2 / (4 * t)
             return A * exp1(u)
 
-        s = theis(t)
+        s = theis(A=A, a=a, b=b, t=t)
         for i in range(1, self.nterms + 1, 2):
             s -= theis(A=A, a=a, b=-i + b, t=t) + theis(A=A, a=a, b=i + b, t=t)
             s += theis(A=A, a=a, b=-(i + 1) + b, t=t) + theis(
