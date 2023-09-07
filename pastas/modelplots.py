@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.ticker import LogFormatter, MultipleLocator
-from pandas import Series, concat
+from pandas import Series, Timestamp, concat
 
 from pastas.typing import Axes, Figure, Model, TimestampType
 
@@ -29,12 +29,11 @@ class Plotting:
     """Class that contains all plotting methods for Pastas models.
 
     Pastas models come with a number of predefined plotting methods to quickly
-    visualize a Model. All of these methods are contained in the `plot`
-    attribute of a model. For example, if we stored a
-    :class:`pastas.model.Model` instance in the variable `ml`, the plot
-    methods are available as follows::
+    visualize a Model. All of these methods are contained in the `plot` attribute of
+    a model. For example, if we stored a :class:`pastas.model.Model` instance in the
+    variable `ml`, the plot methods are available as follows::
 
-    >>> ml.plot.results()
+    >>> ml.plots.results()
     """
 
     def __init__(self, ml: Model) -> None:
@@ -42,8 +41,7 @@ class Plotting:
 
     def __repr__(self) -> str:
         msg = (
-            "This module contains all the built-in plotting options that "
-            "are available."
+            "This module contains all the built-in plotting options that are available."
         )
         return msg
 
@@ -69,7 +67,7 @@ class Plotting:
             True to plot the observed time series.
         simulation: bool, optional
             True to plot the simulated time series.
-        ax: Matplotlib.axes instance, optional
+        ax: matplotlib.axes.Axes, optional
             Axes to add the plot to.
         figsize: tuple, optional
             Tuple with the height and width of the figure in inches.
@@ -79,8 +77,7 @@ class Plotting:
         Returns
         -------
         ax: matplotlib.axes.Axes
-            matplotlib axes with the simulated and optionally the observed
-            timeseries.
+            matplotlib axes with the simulated and optionally the observed time series.
 
         Examples
         --------
@@ -105,6 +102,11 @@ class Plotting:
             sim.plot(ax=ax, label=f"{sim.name} ($R^2$ = {r2}%)")
 
         # Dress up the plot
+        # temporary fix, as set_xlim currently does not work with strings mpl=3.6.1
+        if tmin is not None:
+            tmin = Timestamp(tmin)
+        if tmax is not None:
+            tmax = Timestamp(tmax)
         ax.set_xlim(tmin, tmax)
         ax.set_ylabel("Groundwater levels [meter]")
         ax.set_title("Results of {}".format(self.ml.name))
@@ -136,19 +138,18 @@ class Plotting:
         figsize: tuple, optional
             tuple of size 2 to determine the figure size in inches.
         split: bool, optional
-            Split the stresses in multiple stresses when possible. Default is
-            False.
+            Split the stresses in multiple stresses when possible. Default is False.
         adjust_height: bool, optional
-            Adjust the height of the graphs, so that the vertical scale of all
-            the subplots on the left is equal. Default is True.
+            Adjust the height of the graphs, so that the vertical scale of all the
+            subplots on the left is equal. Default is True.
         return_warmup: bool, optional
             Show the warmup-period. Default is false.
         block_or_step: str, optional
             Plot the block- or step-response on the right. Default is 'step'.
-        fig: Matplotib.Figure instance, optional
-            Optionally provide a Matplotib.Figure instance to plot onto.
+        fig: matplotib.Figure instance, optional
+            Optionally provide a matplotib.Figure instance to plot onto.
         **kwargs: dict, optional
-            Optional arguments, passed on to the plt.figure method.
+            Optional arguments, passed on to the matplotlib.pyplot.figure method.
 
         Returns
         -------
@@ -264,8 +265,12 @@ class Plotting:
                 i = i + 1
 
             # plot the step response
+            rkwargs = {}
+            if self.ml.stressmodels[sm_name].rfunc is not None:
+                if self.ml.stressmodels[sm_name].rfunc._name == "HantushWellModel":
+                    rkwargs = {"warn": False}
             response = self.ml._get_response(
-                block_or_step=block_or_step, name=sm_name, add_0=True
+                block_or_step=block_or_step, name=sm_name, add_0=True, **rkwargs
             )
 
             if response is not None:
@@ -286,6 +291,12 @@ class Plotting:
 
         # xlim sets minorticks back after plots:
         ax1.minorticks_off()
+
+        # temporary fix, as set_xlim currently does not work with strings mpl=3.6.1
+        if tmin is not None:
+            tmin = Timestamp(tmin)
+        if tmax is not None:
+            tmax = Timestamp(tmax)
 
         if return_warmup:
             ax1.set_xlim(tmin - self.ml.settings["warmup"], tmax)
@@ -346,11 +357,9 @@ class Plotting:
         tmin: str or pandas.Timestamp, optional
         tmax: str or pandas.Timestamp, optional
         ytick_base: Boolean or float, optional
-            Make the ytick-base constant if True, set this base to float if
-            float.
+            Make the ytick-base constant if True, set this base to float if a float.
         split: bool, optional
-            Split the stresses in multiple stresses when possible. Default is
-            True.
+            Split the stresses in multiple stresses when possible. Default is True.
         axes: matplotlib.axes.Axes instance, optional
             Matplotlib Axes instance to plot the figure on to.
         figsize: tuple, optional
@@ -362,7 +371,7 @@ class Plotting:
         min_ylim_diff: float, optional
             Float with the difference in the ylimits. Default is None
         **kwargs: dict, optional
-            Optional arguments, passed on to the plt.subplots method.
+            Optional arguments, passed on to the matplotlib.pyplot.subplots method.
 
         Returns
         -------
@@ -421,7 +430,7 @@ class Plotting:
             set_axes_properties = True
         else:
             if len(axes) != nrows:
-                msg = "Makes sure the number of axes equals the number of " "series"
+                msg = "Makes sure the number of axes equals the number of series"
                 raise Exception(msg)
             fig = axes[0].figure
             o_label = ""
@@ -480,6 +489,11 @@ class Plotting:
             ax.grid(True)
             ax.minorticks_off()
         if set_axes_properties:
+            # temporary fix, as set_xlim currently does not work with strings mpl=3.6.1
+            if tmin is not None:
+                tmin = Timestamp(tmin)
+            if tmax is not None:
+                tmax = Timestamp(tmax)
             axes[0].set_xlim(tmin, tmax)
         fig.tight_layout(pad=0.0)
 
@@ -510,14 +524,13 @@ class Plotting:
         bins: int optional
             number of bins used for the histogram. 50 is default.
         acf_options: dict, optional
-            dictionary with keyword arguments that are passed on to
-            pastas.stats.acf.
-        fig: Matplotib.Figure instance, optional
-            Optionally provide a Matplotib.Figure instance to plot onto.
+            dictionary with keyword arguments that are passed on to pastas.stats.acf.
+        fig: matplotlib.pyplot.Figure, optional
+            Optionally provide a matplotlib.pyplot.Figure instance to plot onto.
         alpha: float, optional
             Significance level to calculate the (1-alpha)-confidence intervals.
         **kwargs: dict, optional
-            Optional keyword arguments, passed on to plt.figure.
+            Optional keyword arguments, passed on to matplotlib.pyplot.figure method.
 
         Returns
         -------
@@ -527,10 +540,9 @@ class Plotting:
         --------
         >>> axes = ml.plots.diagnostics()
 
-        Note
-        ----
-        This plot assumed that the noise or residuals follow a Normal
-        distribution.
+        Notes
+        -----
+        This plot assumed that the noise or residuals follow a Normal distribution.
 
         See Also
         --------
@@ -578,12 +590,12 @@ class Plotting:
         ----------
         tmin: str or pandas.Timestamp, optional
         tmax: str or pandas.Timestamp, optional
-        ax: Matplotlib.axes instance, optional
+        ax: matplotlib.axes.Axes, optional
             Axes to add the plot to.
         figsize: tuple, optional
             Tuple with the height and width of the figure in inches.
         **kwargs:
-            Passed on to plot_cum_frequency
+            Passed on to plot_cum_frequency.
 
         Returns
         -------
@@ -610,7 +622,7 @@ class Plotting:
         ----------
         stressmodels: list, optional
             List with the stressmodels to plot the block response for.
-        ax: Matplotlib.axes instance, optional
+        ax: matplotlib.axes.Axes, optional
             Axes to add the plot to.
         figsize: tuple, optional
             Tuple with the height and width of the figure in inches.
@@ -713,7 +725,7 @@ class Plotting:
         stresses = _get_stress_series(self.ml, split=split)
 
         rows = len(stresses)
-        rows = -(-rows // cols)  # round up with out additional import
+        rows = -(-rows // cols)  # round up without additional import
 
         fig, axes = plt.subplots(rows, cols, sharex=sharex, figsize=figsize, **kwargs)
 
@@ -752,29 +764,29 @@ class Plotting:
         ----------
         tmin: str or pandas.Timestamp, optional.
         tmax: str or pandas.Timestamp, optional.
-        ax: matplotlib.axes, optional
-            Axes to plot the pie chart on. A new figure and axes will be
-            created of not providided.
+        ax: matplotlib.axes.Axes, optional
+            The Axes to plot the pie chart on. A new figure and axes will be created of
+            not provided.
         figsize: tuple, optional
             tuple of size 2 to determine the figure size in inches.
         split: bool, optional
             Split the stresses in multiple stresses when possible.
         partition : str
-            statistic to use to determine contribution of stress, either
-            'sum' or 'std' (default).
+            statistic to use to determine contribution of stress, either 'sum' or
+            'std' (default).
         wedgeprops: dict, optional, default None
-            dict containing pie chart wedge properties, default is None,
-            which sets edgecolor to white.
+            dict containing pie chart wedge properties, default is None, which sets
+            edgecolor to white.
         startangle: float
-            at which angle to start drawing wedges
+            at which angle to start drawing wedges.
         autopct: str
-            format string to add percentages to pie chart
+            format string to add percentages to pie chart.
         kwargs: dict, optional
             The keyword arguments are passed on to plt.pie.
 
         Returns
         -------
-        ax: matplotlib.axes
+        ax: matplotlib.axes.Axes
         """
         if ax is None:
             _, ax = plt.subplots(figsize=figsize)
@@ -824,10 +836,8 @@ class Plotting:
         **kwargs,
     ) -> Axes:
         """Create a results plot, similar to `ml.plots.results()`, in which the
-        individual contributions of stresses (in stressmodels with multiple
-        stresses) are stacked.
-
-        Note: does not plot the individual contributions of StressModel2
+        individual contributions of stresses (in stressmodels with multiple stresses)
+        are stacked.
 
         Parameters
         ----------
@@ -854,7 +864,6 @@ class Plotting:
 
         # loop over axes showing stressmodel contributions
         for i, sm in zip(range(3, 3 + 2 * nsm, 2), self.ml.stressmodels.keys()):
-
             # Get the contributions for StressModels with multiple stresses
             contributions = []
             sml = self.ml.stressmodels[sm]
@@ -877,19 +886,19 @@ class Plotting:
 
                 # add stacked plot to correct axes
                 ax = axes[i - 1]
-                del ax.lines[0]  # delete existing line
+                ax.lines[0].remove()  # delete existing line
 
-                contrib = [c[1] for c in contributions]  # get timeseries
+                contrib = [c[1] for c in contributions]  # get time series
                 vstack = concat(contrib, axis=1, sort=False)
                 names = [c[0] for c in contributions]  # get names
                 ax.stackplot(vstack.index, vstack.values.T, labels=names)
                 if stacklegend:
                     if stacklegend_kws is None:
                         stacklegend_kws = {}
-                    else:
-                        ncol = stacklegend_kws.pop("ncol", 5)
-                        fontsize = stacklegend_kws.pop("fontsize", 6)
-                        loc = stacklegend_kws.pop("loc", "best")
+                    ncol = stacklegend_kws.pop("ncol", 5)
+                    fontsize = stacklegend_kws.pop("fontsize", 6)
+                    loc = stacklegend_kws.pop("loc", "best")
+
                     ax.legend(loc=loc, ncol=ncol, fontsize=fontsize, **stacklegend_kws)
 
                 # y-scale does not show 0
@@ -932,7 +941,7 @@ class Plotting:
 
         Returns
         -------
-        matplotlib.Axes
+        matplotlib.axes.Axes
         """
         obs = self.ml.observations(tmin=tmin, tmax=tmax)
         stresses = _get_stress_series(self.ml, split=split)
@@ -966,7 +975,7 @@ class Plotting:
 
         Returns
         -------
-        fig: matplotlib.Figure instance
+        fig: matplotlib.pyplot.Figure instance
         """
         if fname is None:
             fname = "{}.pdf".format(self.ml.name)

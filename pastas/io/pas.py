@@ -9,9 +9,16 @@ import json
 from collections import OrderedDict
 from logging import getLogger
 
-from pandas import (DataFrame, Series, Timedelta, Timestamp, isna, read_json,
-                    to_numeric)
-from pastas import TimeSeries
+from pandas import (
+    DataFrame,
+    Series,
+    Timedelta,
+    Timestamp,
+    isna,
+    read_json,
+    to_numeric,
+    to_timedelta,
+)
 
 logger = getLogger(__name__)
 
@@ -30,17 +37,14 @@ def pastas_hook(obj: dict):
             obj[key] = val
         elif key == "series":
             try:
-                obj[key] = read_json(value, typ='series', orient="split")
+                obj[key] = read_json(value, typ="series", orient="split")
             except:
-                try:
-                    obj[key] = TimeSeries(**value)
-                except:
-                    obj[key] = value
+                obj[key] = value
             if isinstance(obj[key], Series):
                 obj[key].index = obj[key].index.tz_localize(None)
         elif key in ["time_offset", "warmup"]:
             if isinstance(value, int) or isinstance(value, float):
-                obj[key] = Timedelta(value, 'd')
+                obj[key] = Timedelta(value, "d")
             else:
                 obj[key] = Timedelta(value)
         elif key in ["parameters", "pcov"]:
@@ -57,7 +61,7 @@ def pastas_hook(obj: dict):
 
 
 def dump(fname: str, data: dict) -> None:
-    json.dump(data, open(fname, 'w'), indent=4, cls=PastasEncoder)
+    json.dump(data, open(fname, "w"), indent=4, cls=PastasEncoder)
     logger.info("%s file successfully exported", fname)
 
 
@@ -66,14 +70,13 @@ class PastasEncoder(json.JSONEncoder):
 
     Notes
     -----
-    Currently supported formats are: DataFrame, Series,
-    Timedelta, Timestamps.
+    Currently supported formats are: DataFrame, Series, Timedelta, Timestamps.
 
     see: https://docs.python.org/3/library/json.html
     """
 
     def default(self, o):
-        if isinstance(o, Timestamp) or isinstance(o, datetime.datetime):
+        if isinstance(o, (Timestamp, datetime.datetime)):
             return o.isoformat()
         elif isinstance(o, Series):
             return o.to_json(date_format="iso", orient="split")
@@ -81,7 +84,9 @@ class PastasEncoder(json.JSONEncoder):
             # Necessary to maintain order when using the JSON format!
             # Do not use o.to_json() because of float precision
             return json.dumps(o.to_dict(orient="index"), indent=0)
-        elif isinstance(o, Timedelta):
+        elif isinstance(o, (Timedelta, datetime.timedelta)):
+            if isinstance(o, datetime.timedelta):
+                o = to_timedelta(o)
             return o.to_timedelta64().__str__()
         elif isna(o):
             return None

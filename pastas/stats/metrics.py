@@ -1,5 +1,5 @@
-"""The following methods may be used to describe the fit between the model
-simulation and the observations.
+"""The following methods may be used to describe the fit between the model simulation
+and the observations.
 
 Examples
 ========
@@ -7,209 +7,217 @@ These methods may be used as follows:
 
 >>> ps.stats.rmse(sim, obs)
 
-or
+or directly from a Pastas model:
 
 >>> ml.stats.rmse()
 """
 
 from logging import getLogger
 
-from numpy import abs, average, log, nan, sqrt
-from pastas.stats.core import _get_weights, mean, std, var
-from pandas import Series
 # Type Hinting
 from typing import Optional
 
-__all__ = ["rmse", "sse", "mae", "nse", "evp", "rsq", "bic", "aic",
-           "pearsonr", "kge_2012"]
+from numpy import abs as npabs
+from numpy import average, log, nan, sqrt
+from pandas import Series
+
+from pastas.stats.core import _get_weights, mean, std, var
+
+__all__ = [
+    "rmse",
+    "sse",
+    "mae",
+    "nse",
+    "evp",
+    "rsq",
+    "bic",
+    "aic",
+    "pearsonr",
+    "kge_2012",
+]
 logger = getLogger(__name__)
 
 
 # Absolute Error Metrics
 
 
-def mae(obs: Optional[Series] = None,
-        sim: Optional[Series] = None,
-        res: Optional[Series] = None,
-        missing: str = "drop",
-        weighted: bool = False,
-        max_gap: int = 30) -> float:
+def mae(
+    obs: Optional[Series] = None,
+    sim: Optional[Series] = None,
+    res: Optional[Series] = None,
+    missing: str = "drop",
+    weighted: bool = False,
+    max_gap: int = 30,
+) -> float:
     """Compute the (weighted) Mean Absolute Error (MAE).
 
     Parameters
     ----------
-    sim: pandas.Series
+    sim: pandas.Series, optional
         Series with the simulated values.
-    obs: pandas.Series
-        Series with the observed values.
-    res: pandas.Series
-        Series with the residual values. If time series for the residuals
-        are provided, the sim and obs arguments are ignored.
+    obs: pandas.Series, optional
+        The Series with the observed values.
+    res: pandas.Series, optional
+        The Series with the residual values. If time series for the residuals are
+        provided, the sim and obs arguments are ignored. Note that the residuals
+        must be computed as `obs - sim` here.
     missing: str, optional
-        string with the rule to deal with missing values. Only "drop" is
-        supported now.
+        string with the rule to deal with missing values. Only "drop" is supported now.
     weighted: bool, optional
-        Weight the values by the normalized time step to account for
-        irregular time series. Default is True.
+        Weight the values by the normalized time step to account for irregular time
+        series. Default is True.
     max_gap: int, optional
-        maximum allowed gap period in days to use for the computation of the
-        weights. All time steps larger than max_gap are replace with the
-        max_gap value. Default value is 30 days.
+        maximum allowed gap period in days to use for the computation of the weights.
+        All time steps larger than max_gap are replace with the max_gap value.
+        Default value is 30 days.
 
     Notes
     -----
-    The Mean Absolute Error (MAE) between two time series x and y is
-    computed as follows:
+    The Mean Absolute Error (MAE) between the observed (:math:`y_o`) and simulated
+    (:math:`y_s`) time series is computed as follows:
 
-    .. math:: \\text{MAE} = \\sum_{i=1}^{N} w_i |x_i - y_i|
+    .. math:: \\text{MAE} = \\sum_{i=1}^{N} w_i |y_s - y_o|
 
     where :math:`N` is the number of observations in the observed time series.
     """
-    if res is None:
-        res = sim - obs
-
-    if missing == "drop":
-        res = res.dropna()
+    err = _compute_err(obs=obs, sim=sim, res=res, missing=missing)
 
     # Return nan if the time indices of the sim and obs don't match
-    if res.index.size == 0:
+    if err.index.size == 0:
         logger.warning("Time indices of the sim and obs don't match.")
         return nan
 
-    w = _get_weights(res, weighted=weighted, max_gap=max_gap)
-    return (w * abs(res.to_numpy())).sum()
+    w = _get_weights(err, weighted=weighted, max_gap=max_gap)
+    return (w * npabs(err.to_numpy())).sum()
 
 
-def rmse(obs: Optional[Series] = None,
-         sim: Optional[Series] = None,
-         res: Optional[Series] = None,
-         missing: str = "drop",
-         weighted: bool = False,
-         max_gap: int = 30) -> float:
+def rmse(
+    obs: Optional[Series] = None,
+    sim: Optional[Series] = None,
+    res: Optional[Series] = None,
+    missing: str = "drop",
+    weighted: bool = False,
+    max_gap: int = 30,
+) -> float:
     """Compute the (weighted) Root Mean Squared Error (RMSE).
 
     Parameters
     ----------
-    sim: pandas.Series
+    sim: pandas.Series, optional
         Series with the simulated values.
-    obs: pandas.Series
-        Series with the observed values.
-    res: pandas.Series
-        Series with the residual values. If time series for the residuals
-        are provided, the sim and obs arguments are ignored.
+    obs: pandas.Series, optional
+        The Series with the observed values.
+    res: pandas.Series, optional
+        The Series with the residual values. If time series for the residuals are
+        provided, the sim and obs arguments are ignored. Note that the residuals
+        must be computed as `obs - sim` here.
     missing: str, optional
-        string with the rule to deal with missing values. Only "drop" is
-        supported now.
+        string with the rule to deal with missing values. Only "drop" is supported now.
     weighted: bool, optional
-        Weight the values by the normalized time step to account for
-        irregular time series. Default is False.
+        Weight the values by the normalized time step to account for irregular time
+        series. Default is False.
     max_gap: int, optional
-        maximum allowed gap period in days to use for the computation of the
-        weights. All time steps larger than max_gap are replace with the
-        max_gap value. Default value is 30 days.
+        maximum allowed gap period in days to use for the computation of the weights.
+        All time steps larger than max_gap are replace with the max_gap value.
+        Default value is 30 days.
 
     Notes
     -----
     Computes the Root Mean Squared Error (RMSE) as follows:
 
-    .. math:: \\text{RMSE} = \\sqrt{\\sum_{i=1}^{N} w_i n_i^2}
+    .. math:: \\text{RMSE} = \\sqrt{\\sum_{i=1}^{N} w_i \\epsilon_i^2}
 
-    where :math:`N` is the number of residuals :math:`n`.
+    where :math:`N` is the number of error :math:`\\epsilon`.
     """
-    if res is None:
-        res = sim - obs
-
-    if missing == "drop":
-        res = res.dropna()
+    err = _compute_err(obs=obs, sim=sim, res=res, missing=missing)
 
     # Return nan if the time indices of the sim and obs don't match
-    if res.index.size == 0:
+    if err.index.size == 0:
         logger.warning("Time indices of the sim and obs don't match.")
         return nan
 
-    w = _get_weights(res, weighted=weighted, max_gap=max_gap)
-    return sqrt((w * res.to_numpy() ** 2).sum())
+    w = _get_weights(err, weighted=weighted, max_gap=max_gap)
+    return sqrt((w * err.to_numpy() ** 2).sum())
 
 
-def sse(obs: Optional[Series] = None,
-        sim: Optional[Series] = None,
-        res: Optional[Series] = None,
-        missing: str = "drop") -> float:
+def sse(
+    obs: Optional[Series] = None,
+    sim: Optional[Series] = None,
+    res: Optional[Series] = None,
+    missing: str = "drop",
+) -> float:
     """Compute the Sum of the Squared Errors (SSE).
 
     Parameters
     ----------
-    sim: pandas.Series
+    sim: pandas.Series, optional
         Series with the simulated values.
-    obs: pandas.Series
-        Series with the observed values.
-    res: pandas.Series
-        Series with the residual values. If time series for the residuals
-        are provided, the sim and obs arguments are ignored.
+    obs: pandas.Series, optional
+        The Series with the observed values.
+    res: pandas.Series, optional
+        The Series with the residual values. If time series for the residuals are
+        provided, the sim and obs arguments are ignored. Note that the residuals
+        must be computed as `obs - sim` here.
     missing: str, optional
-        string with the rule to deal with missing values. Only "drop" is
-        supported now.
+        string with the rule to deal with missing values. Only "drop" is supported now.
 
     Notes
     -----
     The Sum of the Squared Errors (SSE) is calculated as follows:
 
-    .. math:: \\text{SSE} = \\sum(r^2)
+    .. math:: \\text{SSE} = \\sum(\\epsilon^2)
 
-    Where :math:`r` are the residuals.
+    where :math:`\\epsilon` are the errors.
     """
-    if res is None:
-        res = (sim - obs)
-
-    if missing == "drop":
-        res = res.dropna()
+    err = _compute_err(obs=obs, sim=sim, res=res, missing=missing)
 
     # Return nan if the time indices of the sim and obs don't match
-    if res.index.size == 0:
+    if err.index.size == 0:
         logger.warning("Time indices of the sim and obs don't match.")
         return nan
 
-    return (res.to_numpy() ** 2).sum()
+    return (err.to_numpy() ** 2).sum()
 
 
 # Percentage Error Metrics
 
 
-def pearsonr(obs: Series,
-             sim: Series,
-             missing: str = "drop",
-             weighted: bool = False,
-             max_gap: int = 30) -> float:
+def pearsonr(
+    obs: Series,
+    sim: Series,
+    missing: str = "drop",
+    weighted: bool = False,
+    max_gap: int = 30,
+) -> float:
     """Compute the (weighted) Pearson correlation (r).
 
     Parameters
     ----------
     sim: pandas.Series
-        Series with the simulated values.
+        The Series with the simulated values.
     obs: pandas.Series
-        Series with the observed values.
+        The Series with the observed values.
     missing: str, optional
-        string with the rule to deal with missing values in the
-        observed series. Only "drop" is supported now.
+        string with the rule to deal with missing values in the observed series. Only
+        "drop" is supported now.
     weighted: bool, optional
-        Weight the values by the normalized time step to account for
-        irregular time series. Default is False.
+        Weight the values by the normalized time step to account for irregular time
+        series. Default is False.
     max_gap: int, optional
-        maximum allowed gap period in days to use for the computation of the
-        weights. All time steps larger than max_gap are replace with the
-        max_gap value. Default value is 30 days.
+        maximum allowed gap period in days to use for the computation of the weights.
+        All time steps larger than max_gap are replace with the max_gap value.
+        Default value is 30 days.
 
     Notes
     -----
     The Pearson correlation (r) is computed as follows:
 
-    .. math:: r = \\frac{\\sum_{i=1}^{N}w_i (x_i - \\bar{x})(y_i - \\bar{y})}
-        {\\sqrt{\\sum_{i=1}^{N} w_i(x_i-\\bar{x})^2 \\sum_{i=1}^{N}
-        w_i(y_i-\\bar{y})^2}}
+    .. math:: r = \\frac{\\sum_{i=1}^{N}w_i (y_{o,i} - \\bar{y_o})(y_{s,i} - \\bar{
+        y_s})} {\\sqrt{\\sum_{i=1}^{N} w_i(y_{o,i}-\\bar{y_o})^2 \\sum_{i=1}^{N}w_i(
+        y_{s,i} -\\bar{y_s})^2}}
 
-    Where :math:`x` is is observed time series, :math:`y` the simulated
-    time series, and :math:`N` the number of observations in the observed
-    time series.
+    Where :math:`y_o` is observed time series, :math:`y_s` the simulated time series,
+    and :math:`N` the number of observations in the observed time series.
     """
     if missing == "drop":
         obs = obs.dropna()
@@ -225,152 +233,155 @@ def pearsonr(obs: Series,
     sim = sim - average(sim, weights=w)
     obs = obs.to_numpy() - average(obs.to_numpy(), weights=w)
 
-    r = (w * sim * obs).sum() / \
-        sqrt((w * sim ** 2).sum() * (w * obs ** 2).sum())
+    r = (w * sim * obs).sum() / sqrt((w * sim**2).sum() * (w * obs**2).sum())
 
     return r
 
 
-def evp(obs: Series,
-        sim: Optional[Series] = None,
-        res: Optional[Series] = None,
-        missing: str = "drop",
-        weighted: bool = False,
-        max_gap: int = 30) -> float:
+def evp(
+    obs: Series,
+    sim: Optional[Series] = None,
+    res: Optional[Series] = None,
+    missing: str = "drop",
+    weighted: bool = False,
+    max_gap: int = 30,
+) -> float:
     """Compute the (weighted) Explained Variance Percentage (EVP).
 
     Parameters
     ----------
     obs: pandas.Series
         Series with the observed values.
-    sim: pandas.Series
-        Series with the simulated values.
-    res: pandas.Series
-        Series with the residual values. If time series for the residuals
-        are provided, the sim and obs arguments are ignored.
+    sim: pandas.Series, optional
+        The Series with the simulated values.
+    res: pandas.Series, optional
+        The Series with the residual values. If time series for the residuals are
+        provided, the sim and obs arguments are ignored. Note that the residuals
+        must be computed as `obs - sim` here.
     missing: str, optional
-        string with the rule to deal with missing values. Only "drop" is
-        supported now.
+        string with the rule to deal with missing values. Only "drop" is supported now.
     weighted: bool, optional
-        If weighted is True, the variances are computed using the time
-        step between observations as weights. Default is False.
+        If weighted is True, the variances are computed using the time step between
+        observations as weights. Default is False.
     max_gap: int, optional
-        maximum allowed gap period in days to use for the computation of the
-        weights. All time steps larger than max_gap are replace with the
-        max_gap value. Default value is 30 days.
+        maximum allowed gap period in days to use for the computation of the weights.
+        All time steps larger than max_gap are replace with the max_gap value.
+        Default value is 30 days.
 
     Notes
     -----
-    Commonly used goodness-of-fit metric groundwater level models as
-    computed in :cite:t:`von_asmuth_groundwater_2012`.
+    Commonly used goodness-of-fit metric groundwater level models as computed in
+    :cite:t:`von_asmuth_groundwater_2012`.
 
     .. math:: \\text{EVP} = \\frac{\\sigma_h^2 - \\sigma_r^2}{\\sigma_h^2}
         * 100
 
     where :math:`\\sigma_h^2` is the variance of the observations and
-    :math:`\\sigma_r^2` is the variance of the residuals. The returned value
-    is bounded between 0% and 100%.
-
+    :math:`\\sigma_r^2` is the variance of the errors. The returned value is
+    bounded between 0% and 100%.
     """
-    if res is None:
-        res = sim - obs
-
-    if missing == "drop":
-        res = res.dropna()
+    err = _compute_err(obs=obs, sim=sim, res=res, missing=missing)
 
     # Return nan if the time indices of the sim and obs don't match
-    if res.index.size == 0:
+    if err.index.size == 0:
         logger.warning("Time indices of the sim and obs don't match.")
         return nan
 
     if obs.var() == 0.0:
-        return 100.
+        return 100.0
     else:
-        return max(0.0, (1 - var(res, weighted=weighted, max_gap=max_gap) /
-                         var(obs, weighted=weighted, max_gap=max_gap))) * 100
+        return (
+            max(
+                0.0,
+                (
+                    1
+                    - var(err, weighted=weighted, max_gap=max_gap)
+                    / var(obs, weighted=weighted, max_gap=max_gap)
+                ),
+            )
+            * 100
+        )
 
 
-def nse(obs: Series,
-        sim: Optional[Series] = None,
-        res: Optional[Series] = None,
-        missing: str = "drop",
-        weighted: bool = False,
-        max_gap: int = 30) -> float:
+def nse(
+    obs: Series,
+    sim: Optional[Series] = None,
+    res: Optional[Series] = None,
+    missing: str = "drop",
+    weighted: bool = False,
+    max_gap: int = 30,
+) -> float:
     """Compute the (weighted) Nash-Sutcliffe Efficiency (NSE).
 
     Parameters
     ----------
     obs: pandas.Series
         Series with the observed values.
-    sim: pandas.Series
-        Series with the simulated values.
-    res: pandas.Series
-        Series with the residual values. If time series for the residuals
-        are provided, the sim and obs arguments are ignored.
+    sim: pandas.Series, optional
+        The Series with the simulated values.
+    res: pandas.Series, optional
+        The Series with the residual values. If time series for the residuals are
+        provided, the sim and obs arguments are ignored. Note that the residuals
+        must be computed as `obs - sim` here.
     missing: str, optional
-        string with the rule to deal with missing values. Only "drop" is
-        supported now.
+        string with the rule to deal with missing values. Only "drop" is supported now.
     weighted: bool, optional
-        If weighted is True, the variances are computed using the time
-        step between observations as weights. Default is False.
+        If weighted is True, the variances are computed using the time step between
+        observations as weights. Default is False.
     max_gap: int, optional
-        maximum allowed gap period in days to use for the computation of the
-        weights. All time steps larger than max_gap are replace with the
-        max_gap value. Default value is 30 days.
+        maximum allowed gap period in days to use for the computation of the weights.
+        All time steps larger than max_gap are replace with the max_gap value.
+        Default value is 30 days.
 
     Notes
     -----
     NSE computed according to :cite:t:`nash_river_1970`
 
     .. math:: \\text{NSE} = 1 - \\frac{\\sum(h_s-h_o)^2}{\\sum(h_o-\\mu_{h,o})}
-
     """
-    if res is None:
-        res = sim - obs
-
-    if missing == "drop":
-        res = res.dropna()
+    err = _compute_err(obs=obs, sim=sim, res=res, missing=missing)
 
     # Return nan if the time indices of the sim and obs don't match
-    if res.index.size == 0:
+    if err.index.size == 0:
         logger.warning("Time indices of the sim and obs don't match.")
         return nan
 
-    w = _get_weights(res, weighted=weighted, max_gap=max_gap)
+    w = _get_weights(err, weighted=weighted, max_gap=max_gap)
     mu = average(obs.to_numpy(), weights=w)
 
-    return 1 - (w * res.to_numpy() ** 2).sum() / \
-        (w * (obs.to_numpy() - mu) ** 2).sum()
+    return 1 - (w * err.to_numpy() ** 2).sum() / (w * (obs.to_numpy() - mu) ** 2).sum()
 
 
-def rsq(obs: Series,
-        sim: Optional[Series] = None,
-        res: Optional[Series] = None,
-        missing: str = "drop",
-        weighted: bool = False,
-        max_gap: int = 30,
-        nparam: Optional[int] = None) -> float:
+def rsq(
+    obs: Series,
+    sim: Optional[Series] = None,
+    res: Optional[Series] = None,
+    missing: str = "drop",
+    weighted: bool = False,
+    max_gap: int = 30,
+    nparam: Optional[int] = None,
+) -> float:
     """Compute R-squared, possibly adjusted for the number of free parameters.
 
     Parameters
     ----------
     obs: pandas.Series
         Series with the observed values.
-    sim: pandas.Series
-        Series with the simulated values.
-    res: pandas.Series
-        Series with the residual values. If time series for the residuals
-        are provided, the sim and obs arguments are ignored.
+    sim: pandas.Series, optional
+        The Series with the simulated values.
+    res: pandas.Series, optional
+        The Series with the residual values. If time series for the residuals are
+        provided, the sim and obs arguments are ignored. Note that the residuals
+        must be computed as `obs - sim` here.
     missing: str, optional
-        string with the rule to deal with missing values. Only "drop" is
-        supported now.
+        string with the rule to deal with missing values. Only "drop" is supported now.
     weighted: bool, optional
-        If weighted is True, the variances are computed using the time
-        step between observations as weights. Default is False.
+        If weighted is True, the variances are computed using the time step between
+        observations as weights. Default is False.
     max_gap: int, optional
-        maximum allowed gap period in days to use for the computation of the
-        weights. All time steps larger than max_gap are replace with the
-        max_gap value. Default value is 30 days.
+        maximum allowed gap period in days to use for the computation of the weights.
+        All time steps larger than max_gap are replace with the max_gap value.
+        Default value is 30 days.
     nparam: int, optional
         number of calibrated parameters.
 
@@ -378,28 +389,28 @@ def rsq(obs: Series,
     -----
     .. math:: \\rho_{adj} = 1-  \\frac{n-1}{n-n_{param}}*\\frac{rss}{tss}
 
-    Where n is the number of observations, :math:`n_{param}` the number of
-    free parameters, rss the sum of the squared residuals, and tss the total
-    sum of squared residuals.
+    Where n is the number of observations, :math:`n_{param}` the number of free
+    parameters, rss the sum of the squared errors, and tss the total sum of
+    squared errors.
 
-    When nparam is provided, the :math:`\\rho` is
-    adjusted for the number of calibration parameters.
-
+    When nparam is provided, the :math:`\\rho` is adjusted for the number of
+    calibration parameters.
     """
-    if res is None:
-        res = sim - obs
-
-    if missing == "drop":
-        res = res.dropna()
+    err = _compute_err(obs=obs, sim=sim, res=res, missing=missing)
 
     # Return nan if the time indices of the sim and obs don't match
-    if res.index.size == 0:
+    if err.index.size == 0:
         logger.warning("Time indices of the sim and obs don't match.")
         return nan
 
-    w = _get_weights(res, weighted=weighted, max_gap=max_gap)
+    w = _get_weights(err, weighted=weighted, max_gap=max_gap)
+    if len(w) != obs.index.size:
+        raise ValueError(
+            "Weights and observations time series have different lengths! "
+            "Check observation and simulation time series."
+        )
     mu = average(obs.to_numpy(), weights=w)
-    rss = (w * res.to_numpy() ** 2.0).sum()
+    rss = (w * err.to_numpy() ** 2.0).sum()
     tss = (w * (obs.to_numpy() - mu) ** 2.0).sum()
 
     if nparam:
@@ -408,108 +419,105 @@ def rsq(obs: Series,
         return 1.0 - rss / tss
 
 
-def bic(obs: Optional[Series] = None,
-        sim: Optional[Series] = None,
-        res: Optional[Series] = None,
-        missing: str = "drop",
-        nparam: int = 1) -> float:
+def bic(
+    obs: Optional[Series] = None,
+    sim: Optional[Series] = None,
+    res: Optional[Series] = None,
+    missing: str = "drop",
+    nparam: int = 1,
+) -> float:
     """Compute the Bayesian Information Criterium (BIC).
 
     Parameters
     ----------
-    obs: pandas.Series
+    obs: pandas.Series, optional
         Series with the observed values.
-    sim: pandas.Series
-        Series with the simulated values.
-    res: pandas.Series
-        Series with the residual values. If time series for the residuals
-        are provided, the sim and obs arguments are ignored.
+    sim: pandas.Series, optional
+        The Series with the simulated values.
+    res: pandas.Series, optional
+        The Series with the residual values. If time series for the residuals are
+        provided, the sim and obs arguments are ignored. Note that the residuals
+        must be computed as `obs - sim` here.
     nparam: int, optional
         number of calibrated parameters.
     missing: str, optional
-        string with the rule to deal with missing values. Only "drop" is
-        supported now.
+        string with the rule to deal with missing values. Only "drop" is supported now.
 
     Notes
     -----
-    The Bayesian Information Criterium (BIC) :cite:t:`akaike_bayesian_1979`
-    is computed as follows:
+    The Bayesian Information Criterium (BIC) :cite:p:`akaike_bayesian_1979` is
+    computed as follows:
 
     .. math:: \\text{BIC} = -2 log(L) + n_{param} * log(N)
 
     where :math:`n_{param}` is the number of calibration parameters.
-
     """
-    if res is None:
-        res = sim - obs
-
-    if missing == "drop":
-        res = res.dropna()
+    err = _compute_err(obs=obs, sim=sim, res=res, missing=missing)
 
     # Return nan if the time indices of the sim and obs don't match
-    if res.index.size == 0:
+    if err.index.size == 0:
         logger.warning("Time indices of the sim and obs don't match.")
         return nan
 
-    return (res.index.size *
-            log((res.to_numpy() ** 2.0).sum() / res.index.size) +
-            nparam * log(res.index.size))
+    n = err.index.size
+
+    return n * log((err.to_numpy() ** 2.0).sum() / n) + nparam * log(n)
 
 
-def aic(obs: Optional[Series] = None,
-        sim: Optional[Series] = None,
-        res: Optional[Series] = None,
-        missing: str = "drop",
-        nparam: int = 1) -> float:
+def aic(
+    obs: Optional[Series] = None,
+    sim: Optional[Series] = None,
+    res: Optional[Series] = None,
+    missing: str = "drop",
+    nparam: int = 1,
+) -> float:
     """Compute the Akaike Information Criterium (AIC).
 
     Parameters
     ----------
-    obs: pandas.Series
+    obs: pandas.Series, optional
         Series with the observed values.
-    sim: pandas.Series
-        Series with the simulated values.
-    res: pandas.Series
-        Series with the residual values. If time series for the residuals
-        are provided, the sim and obs arguments are ignored.
+    sim: pandas.Series, optional
+        The Series with the simulated values.
+    res: pandas.Series, optional
+        The Series with the residual values. If time series for the residuals are
+        provided, the sim and obs arguments are ignored. Note that the residuals
+        must be computed as `obs - sim` here.
     nparam: int, optional
         number of calibrated parameters.
     missing: str, optional
-        string with the rule to deal with missing values. Only "drop" is
-        supported now.
+        string with the rule to deal with missing values. Only "drop" is supported now.
 
     Notes
     -----
-    The Akaike Information Criterium (AIC) :cite:t:`akaike_new_1970` is
-    computed as follows:
+    The Akaike Information Criterium (AIC) :cite:p:`akaike_new_1974` is computed as
+    follows:
 
     .. math:: \\text{AIC} = -2 log(L) + 2 nparam
 
-    where :math:`n_{param}` is the number of calibration parameters and L is
-    the likelihood function for the model.
-
+    where :math:`n_{param}` is the number of calibration parameters and L is the
+    likelihood function for the model.
     """
-    if res is None:
-        res = sim - obs
-
-    if missing == "drop":
-        res = res.dropna()
+    err = _compute_err(obs=obs, sim=sim, res=res, missing=missing)
 
     # Return nan if the time indices of the sim and obs don't match
-    if res.index.size == 0:
+    if err.index.size == 0:
         logger.warning("Time indices of the sim and obs don't match.")
         return nan
 
-    return (res.index.size *
-            log((res.to_numpy() ** 2.0).sum() / res.index.size) + 2.0 * nparam)
+    n = err.index.size
+
+    return n * log((err.to_numpy() ** 2.0).sum() / n) + 2.0 * nparam
 
 
 # Forecast Error Metrics
-def kge_2012(obs: Series,
-             sim: Series,
-             missing: str = "drop",
-             weighted: bool = False,
-             max_gap: int = 30) -> float:
+def kge_2012(
+    obs: Series,
+    sim: Series,
+    missing: str = "drop",
+    weighted: bool = False,
+    max_gap: int = 30,
+) -> float:
     """Compute the (weighted) Kling-Gupta Efficiency (KGE).
 
     Parameters
@@ -517,7 +525,7 @@ def kge_2012(obs: Series,
     sim: pandas.Series
         Series with the simulated values.
     obs: pandas.Series
-        Series with the observed values.
+        The Series with the observed values.
     missing: str, optional
         string with the rule to deal with missing values. Only "drop" is
         supported now.
@@ -540,7 +548,6 @@ def kge_2012(obs: Series,
     \\frac{\\bar{\\sigma}_x / \\bar{x}}{\\bar{\\sigma}_y / \\bar{y}}`. If
     weighted equals True, the weighted mean, variance and pearson
     correlation are used.
-
     """
     if missing == "drop":
         obs = obs.dropna()
@@ -558,8 +565,56 @@ def kge_2012(obs: Series,
     mu_obs = mean(obs, weighted=weighted, max_gap=max_gap)
 
     beta = mu_sim / mu_obs
-    gamma = (std(sim, weighted=weighted, max_gap=max_gap) / mu_sim) / \
-            (std(obs, weighted=weighted, max_gap=max_gap) / mu_obs)
+    gamma = (std(sim, weighted=weighted, max_gap=max_gap) / mu_sim) / (
+        std(obs, weighted=weighted, max_gap=max_gap) / mu_obs
+    )
 
     kge = 1 - sqrt((r - 1) ** 2 + (beta - 1) ** 2 + (gamma - 1) ** 2)
     return kge
+
+
+def _compute_err(
+    obs: Optional[Series] = None,
+    sim: Optional[Series] = None,
+    res: Optional[Series] = None,
+    missing: str = "drop",
+):
+    """
+
+    Parameters
+    ----------
+    Parameters
+    ----------
+    sim: pandas.Series, optional
+        Series with the simulated values.
+    obs: pandas.Series, optional
+        The Series with the observed values.
+    res: pandas.Series, optional
+        The Series with the residual values. If time series for the residuals are
+        provided, the sim and obs arguments are ignored. Note that the residuals
+        must be computed as `obs - sim` here.
+    missing: str, optional
+        string with the rule to deal with missing values. Only "drop" is supported now.
+
+    Returns
+    -------
+    err: pandas.Series
+        The pandas.Series with the errors, computed as
+
+    """
+    if (obs is not None) and (sim is not None):
+        err = sim.subtract(obs)
+    elif res is not None:
+        err = -res
+    else:
+        msg = (
+            "Either the residuals, or the simulation and observations have to be "
+            "provided. Please provide one of these two input options."
+        )
+        logger.error(msg)
+        raise ValueError(msg)
+
+    if missing == "drop":
+        err = err.dropna()
+
+    return err

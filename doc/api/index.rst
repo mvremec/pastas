@@ -10,18 +10,21 @@ left-hand menu you will find the different categories of the API documentation.
 .. autosummary::
     :toctree: ./generated
     :nosignatures:
-    :recursive:
 
     model.Model
-    modelplots.Plotting
-    timeseries.TimeSeries
     stressmodels
-    recharge
     noisemodels
     transform
     rfunc
+    recharge
     solver
+    objective_functions
+    modelplots.Plotting
+    modelcompare.CompareModels
+    timeseries.TimeSeries
+    timeseries_utils
     utils
+    timer.SolveTimer
     plots
     stats
 

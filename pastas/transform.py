@@ -1,7 +1,6 @@
 """This module contains all the transforms that can be added to a model.
 
-These transforms are applied after the simulation, to incorporate
-nonlinear effects.
+These transforms are applied after the simulation, to incorporate nonlinear effects.
 """
 import numpy as np
 from pandas import DataFrame, Series
@@ -14,30 +13,28 @@ from .utils import validate_name
 
 
 class ThresholdTransform:
-    """ThresholdTransform lowers the simulation when it exceeds a certain
-    value.
+    """ThresholdTransform lowers the simulation when it exceeds a certain value.
 
     Parameters
     ----------
     value : float, optional
-        The starting value above which the simulation is lowered
+        The initial starting value above which the simulation is lowered.
     vmin : float, optional
-        The minimum value above which the simulation is lowered
-    vmin : float, optional
-        The maximum value above which the simulation is lowered
+        The minimum value above which the simulation is lowered.
+    vmax : float, optional
+        The maximum value above which the simulation is lowered.
     name: str, optional
-        Name of the transform
+        Name of the transform.
     nparam : int, optional
-        The number of parameters. Default is nparam=2. The first parameter
-        then is the threshold, and the second parameter is the factor with
-        which the simulation is lowered.
+        The number of parameters. Default is nparam=2. The first parameter then is
+        the threshold, and the second parameter is the factor with which the
+        simulation is lowered.
 
     Notes
     -----
-    In geohydrology this transform can be used in a situation where the
-    groundwater level reaches the surface level and forms a lake. Because
-    of the larger storage of the lake, the (groundwater) level then rises
-    slower when it rains.
+    In geohydrology this transform can be used in a situation where the groundwater
+    level reaches the surface level and forms a lake. Because of the larger storage
+    of the lake, the (groundwater) level then rises slower when it rains.
     """
 
     _name = "ThresholdTransform"
@@ -110,14 +107,23 @@ class ThresholdTransform:
 
     @set_parameter
     def _set_vary(self, name: str, value: float) -> None:
-        """Internal method to set if the parameter is varied during
-        optimization.
+        """Internal method to set if the parameter is varied during optimization.
 
         Notes
         -----
         The preferred method for parameter setting is through the model.
         """
         self.parameters.loc[name, "vary"] = bool(value)
+
+    @set_parameter
+    def _set_dist(self, name: str, value: str) -> None:
+        """Internal method to set distribution of prior of the parameter.
+
+        Notes
+        -----
+        The preferred method for parameter setting is through the model.
+        """
+        self.parameters.loc[name, "dist"] = str(value)
 
     def simulate(self, h: Series, p: ArrayLike) -> Series:
         if self.nparam == 1:
@@ -133,7 +139,7 @@ class ThresholdTransform:
 
     def to_dict(self) -> dict:
         data = {
-            "transform": self._name,
+            "class": self._name,
             "value": self.value,
             "vmin": self.vmin,
             "vmax": self.vmax,

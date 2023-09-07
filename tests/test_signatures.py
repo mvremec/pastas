@@ -1,46 +1,34 @@
 import numpy as np
-import pandas as pd
+from pandas import Series, date_range
 
 import pastas as ps
 
 
 def test_summary():
     """Test all signatures for minimal functioning."""
-    idx = pd.date_range("2000", "2010")
-    head = pd.Series(index=idx, data=np.random.rand(len(idx)), dtype=float)
+    idx = date_range("2000", "2010")
+    head = Series(index=idx, data=np.random.rand(len(idx)), dtype=float)
     ps.stats.signatures.summary(head)
 
 
-def test_colwell_components():
+def test_colwell_components(collwell_data: Series) -> None:
+    ps.stats.signatures.colwell_components(collwell_data, freq="4M", bins=3)
+    return
+
+
+def test_colwell_predictability(collwell_data: Series) -> None:
     """Example Tree C from the publication."""
-    n = 9
-    x = (
-        ["200{}-04-01".format(t) for t in range(0, n)]
-        + ["200{}-08-02".format(t) for t in range(0, n)]
-        + ["201{}-08-01".format(t) for t in range(0, n)]
-    )
-    y = [1] * n + [2] * n + [3] * n
-    obs = pd.Series(y, index=pd.to_datetime(x))
-    ps.stats.signatures.colwell_components(obs, freq="4M", bins=3)
-    return obs
+    p = ps.stats.signatures.colwell_components(collwell_data, freq="4M", bins=3)[0]
+    assert round(p, 2) == 1.0
 
 
-def test_colwell_predictability():
+def test_colwell_constancy(collwell_data: Series) -> None:
     """Example Tree C from the publication."""
-    obs = test_colwell_components()
-    p = ps.stats.signatures.colwell_components(obs, freq="4M", bins=3)[0]
-    assert p.round(2) == 1.0
+    c = ps.stats.signatures.colwell_components(collwell_data, freq="4M", bins=3)[1]
+    assert round(c, 2) == 0.42
 
 
-def test_colwell_constancy():
+def test_colwell_contingency(collwell_data: Series) -> None:
     """Example Tree C from the publication."""
-    obs = test_colwell_components()
-    c = ps.stats.signatures.colwell_components(obs, freq="4M", bins=3)[1]
-    assert c.round(2) == 0.42
-
-
-def test_colwell_contingency():
-    """Example Tree C from the publication."""
-    obs = test_colwell_components()
-    m = ps.stats.signatures.colwell_components(obs, freq="4M", bins=3)[2]
-    assert m.round(2) == 0.58
+    m = ps.stats.signatures.colwell_components(collwell_data, freq="4M", bins=3)[2]
+    assert round(m, 2) == 0.58

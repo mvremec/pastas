@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jun  3 12:10:05 2019
-
-@author: Artesia
-"""
 import os
 import shutil
 
@@ -21,11 +15,14 @@ os.mkdir(os.path.join(pathname, testdir))
 
 @pytest.mark.notebooks
 @pytest.mark.parametrize("file", files)
-def test_notebook(file):
+def test_notebook(file) -> None:
     cwd = os.getcwd()
 
     os.chdir(pathname)
-    if file not in ["12_emcee_uncertainty.ipynb", "19_reservoir.ipynb"]:
+    if file not in [
+        "prepare_timeseries.ipynb",
+        "emcee_uncertainty.ipynb",
+    ]:
         try:
             # run autotest on each notebook
             cmd = (

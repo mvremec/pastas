@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jun  3 12:10:05 2019
-
-@author: Artesia
-"""
 import os
 
 import matplotlib.pyplot as plt
@@ -15,7 +9,7 @@ files = [f for f in os.listdir(pathname) if f.endswith(".py")]
 
 
 @pytest.mark.parametrize("file", files)
-def test_example(file):
+def test_example(file) -> None:
     cwd = os.getcwd()
     os.chdir(pathname)
     try:
