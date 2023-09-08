@@ -1885,8 +1885,14 @@ class Model:
         check["len_oseries_calib"] = len_oseries_calib
 
         for sm_name in self.stressmodels:
-            if self.stressmodels[sm_name].rfunc._name == "HantushWellModel":
-                kwargs = {"warn": False}
+            if self.stressmodels[sm_name] is not None:
+                if self.stressmodels[sm_name].rfunc is not None:
+                    if self.stressmodels[sm_name].rfunc._name == "HantushWellModel":
+                        kwargs = {"warn": False}
+                    else:
+                        kwargs = {}
+                else:
+                    kwargs = {}
             else:
                 kwargs = {}
             check.loc[sm_name, "response_tmax"] = self.get_response_tmax(

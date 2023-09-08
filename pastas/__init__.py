@@ -36,6 +36,7 @@ from .stressmodels import (
     StressModel,
     TarsoModel,
     WellModel,
+    ReservoirModel,
 )
 from .timeseries import validate_oseries, validate_stress
 from .transform import ThresholdTransform
